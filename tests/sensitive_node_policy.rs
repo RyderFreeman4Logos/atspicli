@@ -40,4 +40,15 @@ fn test_sensitive_node_policy_blocks_read_and_screenshot() {
         )
         .expect_err("sensitive screenshot should fail");
     assert_eq!(screenshot_error.exit_code(), 8);
+
+    let full_screenshot_error = executor
+        .execute(
+            &context,
+            &CommandRequest::Screenshot {
+                locator: None,
+                output: "/tmp/should-not-exist-full.png".to_string(),
+            },
+        )
+        .expect_err("full screenshot should fail when any node is sensitive");
+    assert_eq!(full_screenshot_error.exit_code(), 8);
 }

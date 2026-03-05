@@ -31,6 +31,10 @@ impl CommandBackend for AtspiBackend {
         self.query.read_node(locator)
     }
 
+    fn has_sensitive_nodes(&self, app: &AppDescriptor) -> Result<bool> {
+        self.query.has_sensitive_nodes(app)
+    }
+
     fn snapshot(&self, locator: &str) -> Result<String> {
         let _node = self.read_node(locator)?;
         Ok(format!("{{\"snapshot\":\"{locator}\"}}"))

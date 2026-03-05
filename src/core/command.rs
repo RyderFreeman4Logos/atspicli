@@ -84,6 +84,7 @@ impl CommandOutput {
 pub trait CommandBackend {
     fn list_apps(&self) -> Result<Vec<AppDescriptor>>;
     fn read_node(&self, locator: &str) -> Result<NodeDescriptor>;
+    fn has_sensitive_nodes(&self, app: &AppDescriptor) -> Result<bool>;
     fn snapshot(&self, locator: &str) -> Result<String>;
     fn get_property(&self, locator: &str, property: &str) -> Result<String>;
     fn wait_for(&self, locator: &str, timeout: Duration) -> Result<()>;
@@ -116,7 +117,7 @@ impl<'a> CommandExecutor<'a> {
         }
 
         let apps = self.backend.list_apps()?;
-        let _resolved_app = context.resolve_app(&apps)?;
+        let resolved_app = context.resolve_app(&apps)?;
 
         match request {
             CommandRequest::Snapshot { locator } => {
@@ -188,6 +189,8 @@ impl<'a> CommandExecutor<'a> {
             CommandRequest::Screenshot { locator, output } => {
                 if let Some(loc) = locator {
                     self.validate_and_check_sensitive(loc)?;
+                } else if let Some(app) = resolved_app.as_ref() {
+                    self.validate_full_screenshot_policy(app)?;
                 }
                 self.backend
                     .screenshot(locator.as_deref(), Path::new(output))?;
@@ -221,6 +224,16 @@ impl<'a> CommandExecutor<'a> {
         if node.sensitive {
             return Err(AtspiCliError::SensitiveNodePolicy(format!(
                 "Locator '{locator}' is sensitive and cannot be read or captured"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_full_screenshot_policy(&self, app: &AppDescriptor) -> Result<()> {
+        if self.backend.has_sensitive_nodes(app)? {
+            return Err(AtspiCliError::SensitiveNodePolicy(format!(
+                "Application '{}' ({}) has sensitive nodes; full-window screenshots are blocked",
+                app.name, app.pid
             )));
         }
         Ok(())

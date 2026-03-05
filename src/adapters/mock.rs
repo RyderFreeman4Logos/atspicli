@@ -72,6 +72,15 @@ impl CommandBackend for InMemoryBackend {
             .ok_or_else(|| AtspiCliError::NodeNotFound(locator.to_string()))
     }
 
+    fn has_sensitive_nodes(&self, _app: &AppDescriptor) -> Result<bool> {
+        Ok(self
+            .nodes
+            .lock()
+            .expect("nodes mutex")
+            .values()
+            .any(|node| node.sensitive))
+    }
+
     fn snapshot(&self, locator: &str) -> Result<String> {
         let node = self.read_node(locator)?;
         self.events

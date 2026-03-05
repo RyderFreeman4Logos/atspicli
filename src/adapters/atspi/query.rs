@@ -6,20 +6,32 @@ pub struct AtspiQuery;
 
 impl AtspiQuery {
     pub fn list_applications_sync(&self) -> Result<Vec<AppDescriptor>> {
-        if let Ok(raw) = std::env::var("ATSPICLI_FAKE_APPS") {
-            let parsed = raw
-                .split(',')
-                .filter_map(|entry| {
-                    let (name, pid_str) = entry.split_once(':')?;
-                    let pid = pid_str.parse::<u32>().ok()?;
-                    Some(AppDescriptor::new(name.trim(), pid))
-                })
-                .collect::<Vec<AppDescriptor>>();
-            if !parsed.is_empty() {
-                return Ok(parsed);
-            }
+        #[cfg(debug_assertions)]
+        if let Some(parsed) = Self::parse_fake_apps_from_env() {
+            return Ok(parsed);
         }
         Ok(vec![AppDescriptor::new("default-app", std::process::id())])
+    }
+
+    pub fn has_sensitive_nodes(&self, _app: &AppDescriptor) -> Result<bool> {
+        Ok(false)
+    }
+
+    #[cfg(debug_assertions)]
+    fn parse_fake_apps_from_env() -> Option<Vec<AppDescriptor>> {
+        let raw = std::env::var("ATSPICLI_FAKE_APPS").ok()?;
+        let parsed = raw
+            .split(',')
+            .filter_map(|entry| {
+                let (name, pid_str) = entry.split_once(':')?;
+                let pid = pid_str.parse::<u32>().ok()?;
+                Some(AppDescriptor::new(name.trim(), pid))
+            })
+            .collect::<Vec<AppDescriptor>>();
+        if parsed.is_empty() {
+            return None;
+        }
+        Some(parsed)
     }
 
     pub fn read_node(&self, locator: &str) -> Result<NodeDescriptor> {
