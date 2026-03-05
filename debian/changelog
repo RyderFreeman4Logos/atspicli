@@ -1,0 +1,6 @@
+atspicli (0.1.0-1) unstable; urgency=medium
+
+  * Initial Debian packaging for atspicli.
+  * Add least-privilege security notes in package metadata.
+
+ -- RyderFreeman4Logos <noreply@example.com>  Thu, 05 Mar 2026 00:00:00 +0000

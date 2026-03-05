@@ -1,0 +1,28 @@
+[package]
+name = "atspicli"
+version = "0.1.0"
+edition = "2021"
+authors = ["RyderFreeman4Logos"]
+description = "Debian-usable Rust atspicli aligned with axcli.rs"
+license = "MIT"
+
+[dependencies]
+# CLI
+clap = { version = "4.4", features = ["derive"] }
+
+# Async & DBus
+tokio = { version = "1.32", features = ["macros", "rt-multi-thread", "time"] }
+zbus = { version = "3.14" }
+atspi = { version = "0.19", features = ["connection", "tokio"] }
+
+# Error Handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

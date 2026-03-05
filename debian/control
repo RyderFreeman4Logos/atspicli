@@ -1,0 +1,32 @@
+Source: atspicli
+Section: utils
+Priority: optional
+Maintainer: RyderFreeman4Logos <noreply@example.com>
+Build-Depends:
+ debhelper-compat (= 13),
+ cargo,
+ rustc,
+ pkg-config,
+ libatspi2.0-dev (>= 2.46.0),
+ libdbus-1-dev (>= 1.14.0),
+ libglib2.0-dev (>= 2.74.0)
+Standards-Version: 4.7.0
+Rules-Requires-Root: no
+
+Package: atspicli
+Architecture: any
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends},
+ libatspi2-0,
+ libdbus-1-3,
+ libglib2.0-0,
+ dbus-user-session,
+ at-spi2-core
+Description: Rust CLI for AT-SPI automation on Debian
+ atspicli provides a command-line interface aligned to the axcli.rs model.
+ .
+ Security model:
+  - default non-root execution
+  - explicit AT-SPI and DBus runtime dependencies
+  - sensitive node read/screenshot protection
