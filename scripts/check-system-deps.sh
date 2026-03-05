@@ -1,20 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# System dependencies for Debian Bookworm
-packages=("libatspi2.0-dev" "libdbus-1-dev" "libglib2.0-dev" "pkg-config")
-
-# Check via dpkg if available (Debian-based)
-if command -v dpkg > /dev/null 2>&1; then
-    echo "Checking packages via dpkg..."
-    for pkg in "${packages[@]}"; do
-        if ! dpkg -l "$pkg" > /dev/null 2>&1; then
-            echo "Error: Package $pkg is not installed."
-            exit 1
-        fi
-    done
-else
-    echo "Warning: dpkg not found. Skipping package check."
+if ! command -v pkg-config > /dev/null 2>&1; then
+    echo "Error: pkg-config is required."
+    exit 1
 fi
 
 # Check via pkg-config
@@ -27,5 +16,6 @@ for lib in "${libraries[@]}"; do
     fi
 done
 
-echo "All system dependencies are met."
+echo "All system dependencies are met for CLI development."
+echo "If this fails on your distro, install AT-SPI, DBus, and GLib development packages."
 exit 0

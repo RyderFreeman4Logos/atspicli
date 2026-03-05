@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::sync::OnceLock;
+use tracing::warn;
 
 const SENSITIVE_KEY_PATTERN: &str = r"password|passwd|secret|token|api[_-]?key|access[_-]?token|refresh[_-]?token|client[_-]?secret";
 
@@ -47,6 +48,7 @@ fn redaction_patterns() -> Option<&'static RedactionPatterns> {
 
 pub fn redact_sensitive(input: &str) -> String {
     let Some(patterns) = redaction_patterns() else {
+        warn!("Regex patterns failed to compile in redact_sensitive, falling back to full redaction.");
         return "<redacted>".to_string();
     };
 
