@@ -1,0 +1,10 @@
+atspicli for Debian
+===================
+
+Security and privilege model:
+
+- Run `atspicli` as a normal user (non-root) by default.
+- Ensure the user session has access to DBus and AT-SPI:
+  - `dbus-user-session`
+  - `at-spi2-core`
+- Avoid running the tool with elevated privileges unless a site policy requires it.

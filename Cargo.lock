@@ -297,6 +297,7 @@ dependencies = [
  "anyhow",
  "atspi",
  "clap",
+ "regex",
  "serde",
  "serde_json",
  "thiserror",
