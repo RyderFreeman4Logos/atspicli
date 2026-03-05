@@ -3,7 +3,7 @@ name = "atspicli"
 version = "0.1.0"
 edition = "2021"
 authors = ["RyderFreeman4Logos"]
-description = "Debian-usable Rust atspicli aligned with axcli.rs"
+description = "Rust atspicli aligned with axcli.rs"
 license = "MIT"
 
 [dependencies]
