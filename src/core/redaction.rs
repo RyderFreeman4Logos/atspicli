@@ -48,7 +48,9 @@ fn redaction_patterns() -> Option<&'static RedactionPatterns> {
 
 pub fn redact_sensitive(input: &str) -> String {
     let Some(patterns) = redaction_patterns() else {
-        warn!("Regex patterns failed to compile in redact_sensitive, falling back to full redaction.");
+        warn!(
+            "Regex patterns failed to compile in redact_sensitive, falling back to full redaction."
+        );
         return "<redacted>".to_string();
     };
 
