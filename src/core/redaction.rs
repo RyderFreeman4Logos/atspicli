@@ -47,7 +47,7 @@ fn redaction_patterns() -> Option<&'static RedactionPatterns> {
 
 pub fn redact_sensitive(input: &str) -> String {
     let Some(patterns) = redaction_patterns() else {
-        return input.to_string();
+        return "<redacted>".to_string();
     };
 
     let mut redacted = input.to_string();
