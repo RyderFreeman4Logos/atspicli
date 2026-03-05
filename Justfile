@@ -16,9 +16,17 @@ check:
 	cargo fmt --check
 	cargo clippy --all-targets --all-features -- -D warnings
 	cargo test --locked
+	cargo audit
+	cargo deny check
 
 test:
 	cargo test --locked
+
+audit:
+	cargo audit
+
+deny:
+	cargo deny check
 
 run *args:
 	cargo run --locked -- {{args}}
