@@ -5,7 +5,7 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "atspicli",
     version,
-    about = "Debian-usable Rust atspicli aligned with axcli.rs"
+    about = "Rust atspicli aligned with axcli.rs"
 )]
 pub struct Cli {
     /// Target application name

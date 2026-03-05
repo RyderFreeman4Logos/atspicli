@@ -1,6 +1,27 @@
 # atspicli
 
-`atspicli` is a Debian-targeted Rust CLI for AT-SPI automation, aligned with the `axcli.rs` command model.
+`atspicli` is a Rust CLI for AT-SPI automation, aligned with the `axcli.rs` command model.
+
+## Quickstart (CLI-first)
+
+Use `mise` for toolchain setup, then run one bootstrap command:
+
+```bash
+mise install
+./scripts/bootstrap-cli.sh
+```
+
+Run the CLI:
+
+```bash
+cargo run -- --help
+```
+
+Example:
+
+```bash
+cargo run -- --app firefox snapshot root
+```
 
 ## Security and least privilege
 
@@ -31,7 +52,5 @@
 Run local checks:
 
 ```bash
-cargo fmt --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --locked
+just check
 ```
