@@ -154,8 +154,9 @@ async fn check_sensitive_recursive(
     proxy: &AccessibleProxy<'_>,
     max_depth: i32,
 ) -> std::result::Result<bool, zbus::Error> {
+    // Fail-closed: if we can't fully traverse, assume sensitive nodes exist.
     if max_depth <= 0 {
-        return Ok(false);
+        return Ok(true);
     }
 
     let role = proxy.get_role().await.unwrap_or(Role::Invalid);
@@ -176,9 +177,10 @@ async fn check_sensitive_recursive(
 
     let child_count = proxy.child_count().await.unwrap_or(0);
     for i in 0..child_count {
+        // Fail-closed: unreadable children are treated as potentially sensitive.
         let child_accessible = match proxy.get_child_at_index(i).await {
             Ok(c) => c,
-            Err(_) => continue,
+            Err(_) => return Ok(true),
         };
         let child_proxy = match AccessibleProxy::builder(conn)
             .destination(child_accessible.name.as_str())
@@ -186,9 +188,9 @@ async fn check_sensitive_recursive(
         {
             Ok(b) => match b.build().await {
                 Ok(p) => p,
-                Err(_) => continue,
+                Err(_) => return Ok(true), // fail-closed
             },
-            Err(_) => continue,
+            Err(_) => return Ok(true), // fail-closed
         };
         if Box::pin(check_sensitive_recursive(conn, &child_proxy, max_depth - 1)).await? {
             return Ok(true);

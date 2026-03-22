@@ -168,7 +168,8 @@ impl AtspiQuery {
             .build()
             .await?;
 
-        // Search all applications for the matching node
+        // TODO: Filter by target app (--app/--pid) once CommandBackend trait
+        // passes app context to read_node. Currently searches all applications.
         let children = root.get_children().await?;
         for child in &children {
             let child_bus = child.name.to_string();
@@ -259,7 +260,7 @@ impl AtspiQuery {
                     .map_err(|e| zbus::Error::Failure(format!("JSON serialization failed: {e}")));
             }
 
-            // Find the matching node and snapshot from there
+            // Find the matching node, then re-walk from it with depth limit
             if let Ok(Some(found)) = tree::find_node(
                 conn.connection(),
                 &child_proxy,
@@ -269,9 +270,22 @@ impl AtspiQuery {
             )
             .await
             {
-                // Re-walk from the found node's position with depth limit
-                // Since we already have the tree, just re-serialize with depth
-                let json = serde_json::to_string_pretty(&found)
+                // Re-walk from the found node's D-Bus identity to apply depth
+                let found_proxy = AccessibleProxy::builder(conn.connection())
+                    .destination(found.bus_name.as_str())?
+                    .path(found.object_path.as_str())?
+                    .build()
+                    .await?;
+                let depth_limited = tree::walk_tree(
+                    conn.connection(),
+                    &found_proxy,
+                    depth,
+                    0,
+                    &found.bus_name,
+                    &found.object_path,
+                )
+                .await?;
+                let json = serde_json::to_string_pretty(&depth_limited)
                     .map_err(|e| zbus::Error::Failure(format!("JSON serialization failed: {e}")))?;
                 return Ok(json);
             }
