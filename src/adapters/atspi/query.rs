@@ -169,9 +169,11 @@ impl AtspiQuery {
         // Search all applications for the matching node
         let children = root.get_children().await?;
         for child in &children {
+            let child_bus = child.name.to_string();
+            let child_path = child.path.to_string();
             let child_proxy = match AccessibleProxy::builder(conn.connection())
-                .destination(child.name.as_str())
-                .and_then(|b| b.path(child.path.as_ref()))
+                .destination(child_bus.as_str())
+                .and_then(|b| b.path(child_path.as_str()))
             {
                 Ok(b) => match b.build().await {
                     Ok(p) => p,
@@ -181,7 +183,8 @@ impl AtspiQuery {
             };
 
             if let Ok(Some(tree_node)) =
-                tree::find_node(conn.connection(), &child_proxy, locator).await
+                tree::find_node(conn.connection(), &child_proxy, locator, &child_bus, &child_path)
+                    .await
             {
                 return Ok(tree_node.to_node_descriptor(locator));
             }
@@ -221,9 +224,11 @@ impl AtspiQuery {
 
         let children = root.get_children().await?;
         for child in &children {
+            let child_bus = child.name.to_string();
+            let child_path = child.path.to_string();
             let child_proxy = match AccessibleProxy::builder(conn.connection())
-                .destination(child.name.as_str())
-                .and_then(|b| b.path(child.path.as_ref()))
+                .destination(child_bus.as_str())
+                .and_then(|b| b.path(child_path.as_str()))
             {
                 Ok(b) => match b.build().await {
                     Ok(p) => p,
@@ -234,8 +239,15 @@ impl AtspiQuery {
 
             if locator == "root" || locator.trim().is_empty() {
                 // Snapshot from app root
-                let tree_node =
-                    tree::walk_tree(conn.connection(), &child_proxy, depth, 0).await?;
+                let tree_node = tree::walk_tree(
+                    conn.connection(),
+                    &child_proxy,
+                    depth,
+                    0,
+                    &child_bus,
+                    &child_path,
+                )
+                .await?;
                 return serde_json::to_string_pretty(&tree_node).map_err(|e| {
                     zbus::Error::Failure(format!("JSON serialization failed: {e}"))
                 });
@@ -243,7 +255,8 @@ impl AtspiQuery {
 
             // Find the matching node and snapshot from there
             if let Ok(Some(found)) =
-                tree::find_node(conn.connection(), &child_proxy, locator).await
+                tree::find_node(conn.connection(), &child_proxy, locator, &child_bus, &child_path)
+                    .await
             {
                 // Re-walk from the found node's position with depth limit
                 // Since we already have the tree, just re-serialize with depth

@@ -26,6 +26,51 @@ impl AtspiBackend {
             runtime,
         }
     }
+
+    /// Find a node by locator and return its D-Bus identity (bus_name, object_path).
+    fn find_node_for_action(&self, locator: &str) -> Result<(String, String)> {
+        self.runtime
+            .block_on(async {
+                use atspi::connection::AccessibilityConnection;
+                use atspi::proxy::accessible::AccessibleProxy;
+
+                let conn = AccessibilityConnection::open().await?;
+                let root = AccessibleProxy::builder(conn.connection())
+                    .destination("org.a11y.atspi.Registry")?
+                    .path("/org/a11y/atspi/accessible/root")?
+                    .build()
+                    .await?;
+
+                let children = root.get_children().await?;
+                for child in &children {
+                    let child_bus = child.name.to_string();
+                    let child_path = child.path.to_string();
+                    let child_proxy = match AccessibleProxy::builder(conn.connection())
+                        .destination(child_bus.as_str())
+                        .and_then(|b| b.path(child_path.as_str()))
+                    {
+                        Ok(b) => match b.build().await {
+                            Ok(p) => p,
+                            Err(_) => continue,
+                        },
+                        Err(_) => continue,
+                    };
+                    if let Ok(Some(tree_node)) = tree::find_node(
+                        conn.connection(),
+                        &child_proxy,
+                        locator,
+                        &child_bus,
+                        &child_path,
+                    )
+                    .await
+                    {
+                        return Ok((tree_node.bus_name.clone(), tree_node.object_path.clone()));
+                    }
+                }
+                Err(zbus::Error::Failure(format!("Node not found: '{locator}'")))
+            })
+            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
+    }
 }
 
 impl Default for AtspiBackend {
@@ -80,20 +125,83 @@ impl CommandBackend for AtspiBackend {
         }
     }
 
-    fn click(&self, locator: &str, _times: u8) -> Result<()> {
-        self.read_node(locator).map(|_| ())
+    fn click(&self, locator: &str, times: u8) -> Result<()> {
+        let (bus_name, path) = self.find_node_for_action(locator)?;
+        self.runtime
+            .block_on(async {
+                let conn = atspi::connection::AccessibilityConnection::open().await?;
+                let action_proxy = atspi::proxy::action::ActionProxy::builder(conn.connection())
+                    .destination(bus_name.as_str())?
+                    .path(path.as_str())?
+                    .build()
+                    .await?;
+                for _ in 0..times {
+                    action_proxy.do_action(0).await?;
+                }
+                Ok::<_, zbus::Error>(())
+            })
+            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
     }
 
     fn hover(&self, locator: &str) -> Result<()> {
-        self.read_node(locator).map(|_| ())
+        let (bus_name, path) = self.find_node_for_action(locator)?;
+        self.runtime
+            .block_on(async {
+                let conn = atspi::connection::AccessibilityConnection::open().await?;
+                let comp =
+                    atspi::proxy::component::ComponentProxy::builder(conn.connection())
+                        .destination(bus_name.as_str())?
+                        .path(path.as_str())?
+                        .build()
+                        .await?;
+                let (x, y, w, h) = comp.get_extents(atspi::CoordType::Screen).await?;
+                let center_x = x + w / 2;
+                let center_y = y + h / 2;
+                let dec = atspi::proxy::device_event_controller::DeviceEventControllerProxy::new(
+                    conn.connection(),
+                )
+                .await?;
+                dec.generate_mouse_event(center_x, center_y, "abs").await?;
+                Ok::<_, zbus::Error>(())
+            })
+            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
     }
 
     fn focus(&self, locator: &str) -> Result<()> {
-        self.read_node(locator).map(|_| ())
+        let (bus_name, path) = self.find_node_for_action(locator)?;
+        self.runtime
+            .block_on(async {
+                let conn = atspi::connection::AccessibilityConnection::open().await?;
+                let comp =
+                    atspi::proxy::component::ComponentProxy::builder(conn.connection())
+                        .destination(bus_name.as_str())?
+                        .path(path.as_str())?
+                        .build()
+                        .await?;
+                comp.grab_focus().await?;
+                Ok::<_, zbus::Error>(())
+            })
+            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
     }
 
-    fn input_text(&self, locator: &str, _text: &str, _clear_first: bool) -> Result<()> {
-        self.read_node(locator).map(|_| ())
+    fn input_text(&self, locator: &str, text: &str, clear_first: bool) -> Result<()> {
+        let (bus_name, path) = self.find_node_for_action(locator)?;
+        self.runtime
+            .block_on(async {
+                let conn = atspi::connection::AccessibilityConnection::open().await?;
+                let editable =
+                    atspi::proxy::editable_text::EditableTextProxy::builder(conn.connection())
+                        .destination(bus_name.as_str())?
+                        .path(path.as_str())?
+                        .build()
+                        .await?;
+                if clear_first {
+                    editable.set_text_contents("").await?;
+                }
+                editable.set_text_contents(text).await?;
+                Ok::<_, zbus::Error>(())
+            })
+            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
     }
 
     fn press_key(&self, key: &str) -> Result<()> {
@@ -102,15 +210,49 @@ impl CommandBackend for AtspiBackend {
                 "Key cannot be empty".to_string(),
             ));
         }
-        Ok(())
+        self.runtime
+            .block_on(async {
+                let conn = atspi::connection::AccessibilityConnection::open().await?;
+                let dec = atspi::proxy::device_event_controller::DeviceEventControllerProxy::new(
+                    conn.connection(),
+                )
+                .await?;
+                dec.generate_keyboard_event(
+                    0,
+                    key,
+                    atspi::proxy::device_event_controller::KeySynthType::String,
+                )
+                .await?;
+                Ok::<_, zbus::Error>(())
+            })
+            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
     }
 
     fn scroll_to(&self, locator: &str) -> Result<()> {
-        self.read_node(locator).map(|_| ())
+        // Scroll-to: focus the element to make it visible.
+        self.focus(locator)
     }
 
-    fn scroll(&self, _direction: ScrollDirection, _amount: u32) -> Result<()> {
-        Ok(())
+    fn scroll(&self, direction: ScrollDirection, amount: u32) -> Result<()> {
+        self.runtime
+            .block_on(async {
+                let conn = atspi::connection::AccessibilityConnection::open().await?;
+                let dec = atspi::proxy::device_event_controller::DeviceEventControllerProxy::new(
+                    conn.connection(),
+                )
+                .await?;
+                let event_name = match direction {
+                    ScrollDirection::Up => "b4c",
+                    ScrollDirection::Down => "b5c",
+                    ScrollDirection::Left => "b6c",
+                    ScrollDirection::Right => "b7c",
+                };
+                for _ in 0..amount {
+                    dec.generate_mouse_event(0, 0, event_name).await?;
+                }
+                Ok::<_, zbus::Error>(())
+            })
+            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
     }
 
     fn screenshot(&self, locator: Option<&str>, output: &Path) -> Result<()> {

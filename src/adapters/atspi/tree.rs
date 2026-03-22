@@ -14,6 +14,12 @@ pub struct TreeNode {
     pub states: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<TreeNode>,
+    /// D-Bus bus name of the owning application (not serialized).
+    #[serde(skip)]
+    pub bus_name: String,
+    /// D-Bus object path of this accessible node (not serialized).
+    #[serde(skip)]
+    pub object_path: String,
 }
 
 impl TreeNode {
@@ -38,11 +44,17 @@ impl TreeNode {
 
 /// Walk the accessibility tree starting from the given proxy, up to `max_depth` levels.
 /// A `max_depth` of -1 means unlimited.
+///
+/// `proxy_bus_name` and `proxy_obj_path` identify the D-Bus coordinates of the
+/// given proxy so they can be stored in the resulting `TreeNode` for later use
+/// when executing actions.
 pub async fn walk_tree(
     conn: &zbus::Connection,
     proxy: &AccessibleProxy<'_>,
     max_depth: i32,
     current_depth: i32,
+    proxy_bus_name: &str,
+    proxy_obj_path: &str,
 ) -> std::result::Result<TreeNode, zbus::Error> {
     let role = proxy.get_role().await.unwrap_or(Role::Invalid);
     let name = proxy.name().await.unwrap_or_default();
@@ -59,9 +71,11 @@ pub async fn walk_tree(
                 Ok(c) => c,
                 Err(_) => continue,
             };
+            let child_bus = child_accessible.name.to_string();
+            let child_path = child_accessible.path.to_string();
             let child_proxy = match AccessibleProxy::builder(conn)
-                .destination(child_accessible.name.as_str())
-                .and_then(|b| b.path(child_accessible.path.as_ref()))
+                .destination(child_bus.as_str())
+                .and_then(|b| b.path(child_path.as_str()))
             {
                 Ok(b) => match b.build().await {
                     Ok(p) => p,
@@ -69,7 +83,16 @@ pub async fn walk_tree(
                 },
                 Err(_) => continue,
             };
-            if let Ok(child_node) = Box::pin(walk_tree(conn, &child_proxy, max_depth, current_depth + 1)).await {
+            if let Ok(child_node) = Box::pin(walk_tree(
+                conn,
+                &child_proxy,
+                max_depth,
+                current_depth + 1,
+                &child_bus,
+                &child_path,
+            ))
+            .await
+            {
                 children.push(child_node);
             }
         }
@@ -81,15 +104,22 @@ pub async fn walk_tree(
         description,
         states,
         children,
+        bus_name: proxy_bus_name.to_string(),
+        object_path: proxy_obj_path.to_string(),
     })
 }
 
 /// Search the tree for the first node matching the given locator.
 /// Returns the matching `TreeNode` if found.
+///
+/// `app_bus_name` and `app_obj_path` identify the D-Bus coordinates of
+/// `app_proxy` so they propagate into the returned `TreeNode`.
 pub async fn find_node(
     conn: &zbus::Connection,
     app_proxy: &AccessibleProxy<'_>,
     locator: &str,
+    app_bus_name: &str,
+    app_obj_path: &str,
 ) -> std::result::Result<Option<TreeNode>, zbus::Error> {
     let segments = parse_locator_segments(locator);
     if segments.is_empty() {
@@ -97,13 +127,17 @@ pub async fn find_node(
     }
 
     // Special case: "root" matches the app root directly
-    if segments.len() == 1 && segments[0].role.as_deref() == Some("root") && segments[0].text_exact.is_none() && segments[0].text_contains.is_none() {
-        let tree = walk_tree(conn, app_proxy, 0, 0).await?;
+    if segments.len() == 1
+        && segments[0].role.as_deref() == Some("root")
+        && segments[0].text_exact.is_none()
+        && segments[0].text_contains.is_none()
+    {
+        let tree = walk_tree(conn, app_proxy, 0, 0, app_bus_name, app_obj_path).await?;
         return Ok(Some(tree));
     }
 
     // Walk the tree and match segments
-    let tree = walk_tree(conn, app_proxy, -1, 0).await?;
+    let tree = walk_tree(conn, app_proxy, -1, 0, app_bus_name, app_obj_path).await?;
     Ok(match_segments(&tree, &segments, 0, false))
 }
 
@@ -448,6 +482,8 @@ mod tests {
             description: None,
             states: vec![],
             children: vec![],
+            bus_name: String::new(),
+            object_path: String::new(),
         };
         let seg = LocatorSegment {
             role: Some("pushbutton".into()),
@@ -475,6 +511,8 @@ mod tests {
             description: None,
             states: vec![],
             children: vec![],
+            bus_name: String::new(),
+            object_path: String::new(),
         };
         assert!(!node.is_sensitive());
 
