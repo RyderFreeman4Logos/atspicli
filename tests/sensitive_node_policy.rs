@@ -25,6 +25,7 @@ fn test_sensitive_node_policy_blocks_read_and_screenshot() {
             &context,
             &CommandRequest::Snapshot {
                 locator: "input[name=password]".to_string(),
+                depth: 3,
             },
         )
         .expect_err("sensitive snapshot should fail");

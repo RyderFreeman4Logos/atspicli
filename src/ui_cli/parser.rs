@@ -27,6 +27,9 @@ pub enum Commands {
         /// Locator for the root node of the snapshot
         #[arg(default_value = "root")]
         locator: String,
+        /// Maximum traversal depth (-1 for unlimited)
+        #[arg(long, default_value = "3")]
+        depth: i32,
     },
     /// Click an element
     Click {
@@ -83,9 +86,9 @@ pub enum Commands {
     Screenshot {
         /// Locator for the element (optional, defaults to whole window)
         locator: Option<String>,
-        /// Output file path
+        /// Output file path (auto-generated if omitted)
         #[arg(short, long)]
-        output: String,
+        output: Option<String>,
     },
     /// Wait for an element or condition
     Wait {
@@ -109,7 +112,7 @@ pub enum Commands {
 impl From<Commands> for CommandRequest {
     fn from(value: Commands) -> Self {
         match value {
-            Commands::Snapshot { locator } => CommandRequest::Snapshot { locator },
+            Commands::Snapshot { locator, depth } => CommandRequest::Snapshot { locator, depth },
             Commands::Click { locator } => CommandRequest::Click { locator },
             Commands::Dblclick { locator } => CommandRequest::Dblclick { locator },
             Commands::Input { locator, text } => CommandRequest::Input { locator, text },
@@ -120,7 +123,18 @@ impl From<Commands> for CommandRequest {
             Commands::ScrollTo { locator } => CommandRequest::ScrollTo { locator },
             Commands::Scroll { direction, amount } => CommandRequest::Scroll { direction, amount },
             Commands::Screenshot { locator, output } => {
-                CommandRequest::Screenshot { locator, output }
+                let resolved_output = output.unwrap_or_else(|| {
+                    use std::time::SystemTime;
+                    let secs = SystemTime::now()
+                        .duration_since(SystemTime::UNIX_EPOCH)
+                        .map(|d| d.as_secs())
+                        .unwrap_or(0);
+                    format!("screenshot-{secs}.png")
+                });
+                CommandRequest::Screenshot {
+                    locator,
+                    output: resolved_output,
+                }
             }
             Commands::Wait { locator, timeout } => CommandRequest::Wait {
                 locator,

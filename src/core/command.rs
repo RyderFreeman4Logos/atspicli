@@ -17,6 +17,7 @@ fn mask_interactive_input_for_log(_text: &str) -> &'static str {
 pub enum CommandRequest {
     Snapshot {
         locator: String,
+        depth: i32,
     },
     Click {
         locator: String,
@@ -89,7 +90,7 @@ pub trait CommandBackend {
     fn list_apps(&self) -> Result<Vec<AppDescriptor>>;
     fn read_node(&self, locator: &str) -> Result<NodeDescriptor>;
     fn has_sensitive_nodes(&self, app: &AppDescriptor) -> Result<bool>;
-    fn snapshot(&self, locator: &str) -> Result<String>;
+    fn snapshot(&self, locator: &str, depth: i32) -> Result<String>;
     fn get_property(&self, locator: &str, property: &str) -> Result<String>;
     fn wait_for(&self, locator: &str, timeout: Duration) -> Result<()>;
     fn click(&self, locator: &str, times: u8) -> Result<()>;
@@ -124,9 +125,9 @@ impl<'a> CommandExecutor<'a> {
         let resolved_app = context.resolve_app(&apps)?;
 
         match request {
-            CommandRequest::Snapshot { locator } => {
+            CommandRequest::Snapshot { locator, depth } => {
                 self.validate_and_check_sensitive(locator)?;
-                let snapshot = self.backend.snapshot(locator)?;
+                let snapshot = self.backend.snapshot(locator, *depth)?;
                 Ok(CommandOutput::Text(snapshot))
             }
             CommandRequest::Click { locator } => {

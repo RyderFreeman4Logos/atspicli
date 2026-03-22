@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use crate::core::command::CommandBackend;
 use crate::core::model::{AppDescriptor, NodeDescriptor, ScrollDirection};
@@ -15,6 +15,7 @@ pub struct InMemoryBackend {
     properties: Arc<Mutex<HashMap<(String, String), String>>>,
     events: Arc<Mutex<Vec<String>>>,
     focus_failures: Arc<Mutex<Vec<String>>>,
+    delayed_nodes: Arc<Mutex<HashMap<String, (NodeDescriptor, Instant)>>>,
 }
 
 impl InMemoryBackend {
@@ -44,6 +45,13 @@ impl InMemoryBackend {
             .lock()
             .expect("properties mutex")
             .insert((locator.to_string(), key.to_string()), value.into());
+    }
+
+    pub fn add_delayed_node(&self, node: NodeDescriptor, available_after: Duration) {
+        self.delayed_nodes.lock().expect("delayed mutex").insert(
+            node.locator.clone(),
+            (node, Instant::now() + available_after),
+        );
     }
 
     pub fn set_focus_failure(&self, locator: &str) {
@@ -81,19 +89,20 @@ impl CommandBackend for InMemoryBackend {
             .any(|node| node.sensitive))
     }
 
-    fn snapshot(&self, locator: &str) -> Result<String> {
+    fn snapshot(&self, locator: &str, depth: i32) -> Result<String> {
         let node = self.read_node(locator)?;
         self.events
             .lock()
             .expect("events mutex")
-            .push(format!("snapshot:{}", node.locator));
+            .push(format!("snapshot:{}:{}", node.locator, depth));
         Ok(format!(
-            "{{\"locator\":\"{}\",\"visible\":{},\"text\":{}}}",
+            "{{\"locator\":\"{}\",\"visible\":{},\"text\":{},\"depth\":{}}}",
             node.locator,
             node.visible,
             node.text
                 .map(|value| format!("\"{value}\""))
-                .unwrap_or_else(|| "null".to_string())
+                .unwrap_or_else(|| "null".to_string()),
+            depth
         ))
     }
 
@@ -120,19 +129,38 @@ impl CommandBackend for InMemoryBackend {
     }
 
     fn wait_for(&self, locator: &str, timeout: Duration) -> Result<()> {
-        if self
-            .nodes
-            .lock()
-            .expect("nodes mutex")
-            .contains_key(locator)
-        {
-            return Ok(());
+        let start = Instant::now();
+        let poll_interval = Duration::from_millis(50);
+        loop {
+            // Check if a delayed node has become available
+            {
+                let delayed = self.delayed_nodes.lock().expect("delayed mutex");
+                if let Some((node, available_at)) = delayed.get(locator) {
+                    if Instant::now() >= *available_at {
+                        let node = node.clone();
+                        drop(delayed);
+                        self.add_node(node);
+                        return Ok(());
+                    }
+                }
+            }
+            // Check regular nodes
+            if self
+                .nodes
+                .lock()
+                .expect("nodes mutex")
+                .contains_key(locator)
+            {
+                return Ok(());
+            }
+            if start.elapsed() >= timeout {
+                return Err(AtspiCliError::Timeout {
+                    locator: locator.to_string(),
+                    timeout_ms: timeout.as_millis() as u64,
+                });
+            }
+            std::thread::sleep(poll_interval);
         }
-
-        Err(AtspiCliError::Timeout {
-            locator: locator.to_string(),
-            timeout_ms: timeout.as_millis() as u64,
-        })
     }
 
     fn click(&self, locator: &str, times: u8) -> Result<()> {
