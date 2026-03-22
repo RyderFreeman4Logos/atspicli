@@ -11,20 +11,31 @@ use crate::error::{AtspiCliError, Result};
 pub use query::AtspiQuery;
 pub use session::AtspiSession;
 
-#[derive(Default)]
 pub struct AtspiBackend {
     query: AtspiQuery,
+    runtime: tokio::runtime::Runtime,
 }
 
 impl AtspiBackend {
     pub fn new() -> Self {
-        Self { query: AtspiQuery }
+        let runtime =
+            tokio::runtime::Runtime::new().expect("failed to create tokio runtime for AT-SPI");
+        Self {
+            query: AtspiQuery,
+            runtime,
+        }
+    }
+}
+
+impl Default for AtspiBackend {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
 impl CommandBackend for AtspiBackend {
     fn list_apps(&self) -> Result<Vec<AppDescriptor>> {
-        self.query.list_applications_sync()
+        self.query.list_applications_sync(&self.runtime)
     }
 
     fn read_node(&self, locator: &str) -> Result<NodeDescriptor> {

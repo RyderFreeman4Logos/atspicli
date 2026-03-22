@@ -5,12 +5,64 @@ use crate::error::{AtspiCliError, Result};
 pub struct AtspiQuery;
 
 impl AtspiQuery {
-    pub fn list_applications_sync(&self) -> Result<Vec<AppDescriptor>> {
+    pub fn list_applications_sync(
+        &self,
+        runtime: &tokio::runtime::Runtime,
+    ) -> Result<Vec<AppDescriptor>> {
         #[cfg(debug_assertions)]
         if let Some(parsed) = Self::parse_fake_apps_from_env() {
             return Ok(parsed);
         }
-        Ok(vec![AppDescriptor::new("default-app", std::process::id())])
+
+        runtime
+            .block_on(self.list_applications_async())
+            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
+    }
+
+    /// Query the AT-SPI registry for all running accessible applications.
+    async fn list_applications_async(&self) -> std::result::Result<Vec<AppDescriptor>, zbus::Error> {
+        use atspi::connection::AccessibilityConnection;
+        use atspi::proxy::accessible::AccessibleProxy;
+
+        let conn = AccessibilityConnection::open().await?;
+        let root = AccessibleProxy::builder(conn.connection())
+            .destination("org.a11y.atspi.Registry")?
+            .path("/org/a11y/atspi/accessible/root")?
+            .build()
+            .await?;
+
+        let children = root.get_children().await?;
+        let mut apps = Vec::new();
+
+        for child in &children {
+            let child_proxy = AccessibleProxy::builder(conn.connection())
+                .destination(child.name.as_str())?
+                .path(child.path.as_ref())?
+                .build()
+                .await?;
+
+            let name = child_proxy.name().await.unwrap_or_default();
+
+            // Obtain PID via D-Bus connection credentials, falling back to 0.
+            let pid = conn
+                .connection()
+                .call_method(
+                    Some("org.freedesktop.DBus"),
+                    "/org/freedesktop/DBus",
+                    Some("org.freedesktop.DBus"),
+                    "GetConnectionUnixProcessID",
+                    &(child.name.as_str(),),
+                )
+                .await
+                .and_then(|reply| reply.body::<u32>())
+                .unwrap_or(0);
+
+            if !name.is_empty() {
+                apps.push(AppDescriptor::new(name, pid));
+            }
+        }
+
+        Ok(apps)
     }
 
     pub fn has_sensitive_nodes(&self, _app: &AppDescriptor) -> Result<bool> {
