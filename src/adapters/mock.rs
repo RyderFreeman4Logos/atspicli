@@ -48,10 +48,10 @@ impl InMemoryBackend {
     }
 
     pub fn add_delayed_node(&self, node: NodeDescriptor, available_after: Duration) {
-        self.delayed_nodes
-            .lock()
-            .expect("delayed mutex")
-            .insert(node.locator.clone(), (node, Instant::now() + available_after));
+        self.delayed_nodes.lock().expect("delayed mutex").insert(
+            node.locator.clone(),
+            (node, Instant::now() + available_after),
+        );
     }
 
     pub fn set_focus_failure(&self, locator: &str) {
@@ -145,7 +145,12 @@ impl CommandBackend for InMemoryBackend {
                 }
             }
             // Check regular nodes
-            if self.nodes.lock().expect("nodes mutex").contains_key(locator) {
+            if self
+                .nodes
+                .lock()
+                .expect("nodes mutex")
+                .contains_key(locator)
+            {
                 return Ok(());
             }
             if start.elapsed() >= timeout {

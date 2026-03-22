@@ -213,7 +213,8 @@ impl LocatorSegment {
         if let Some(role) = &self.role {
             if role != "root" && !node.role.eq_ignore_ascii_case(role) {
                 // Also try matching without spaces (e.g., "pushbutton" matches "push button")
-                let compact_role: String = node.role.chars().filter(|c| !c.is_whitespace()).collect();
+                let compact_role: String =
+                    node.role.chars().filter(|c| !c.is_whitespace()).collect();
                 if !compact_role.eq_ignore_ascii_case(role) {
                     return false;
                 }
@@ -325,7 +326,9 @@ fn parse_locator_segments(locator: &str) -> Vec<LocatorSegment> {
                 remaining = &remaining[":visible".len()..];
             } else {
                 // Unknown pseudo-selector, skip to next space or end
-                let skip_end = remaining.find(|c: char| c == ' ' || c == '>').unwrap_or(remaining.len());
+                let skip_end = remaining
+                    .find([' ', '>'])
+                    .unwrap_or(remaining.len());
                 remaining = &remaining[skip_end..];
             }
         }
@@ -341,7 +344,12 @@ fn parse_locator_segments(locator: &str) -> Vec<LocatorSegment> {
     segments
 }
 
-fn match_segments(node: &TreeNode, segments: &[LocatorSegment], seg_idx: usize, check_self: bool) -> Option<TreeNode> {
+fn match_segments(
+    node: &TreeNode,
+    segments: &[LocatorSegment],
+    seg_idx: usize,
+    check_self: bool,
+) -> Option<TreeNode> {
     if seg_idx >= segments.len() {
         return None;
     }
@@ -402,17 +410,48 @@ fn format_role(role: Role) -> String {
 fn format_states(state_set: &atspi::StateSet) -> Vec<String> {
     use atspi::State;
     let all_states = [
-        State::Active, State::Armed, State::Busy, State::Checked,
-        State::Collapsed, State::Defunct, State::Editable, State::Enabled,
-        State::Expandable, State::Expanded, State::Focusable, State::Focused,
-        State::HasTooltip, State::Horizontal, State::Iconified, State::Modal,
-        State::MultiLine, State::Multiselectable, State::Opaque, State::Pressed,
-        State::Resizable, State::Selectable, State::Selected, State::Sensitive,
-        State::Showing, State::SingleLine, State::Stale, State::Transient,
-        State::Vertical, State::Visible, State::ManagesDescendants,
-        State::Indeterminate, State::Required, State::Truncated, State::Animated,
-        State::InvalidEntry, State::SupportsAutocompletion, State::SelectableText,
-        State::IsDefault, State::Visited, State::Checkable, State::HasPopup,
+        State::Active,
+        State::Armed,
+        State::Busy,
+        State::Checked,
+        State::Collapsed,
+        State::Defunct,
+        State::Editable,
+        State::Enabled,
+        State::Expandable,
+        State::Expanded,
+        State::Focusable,
+        State::Focused,
+        State::HasTooltip,
+        State::Horizontal,
+        State::Iconified,
+        State::Modal,
+        State::MultiLine,
+        State::Multiselectable,
+        State::Opaque,
+        State::Pressed,
+        State::Resizable,
+        State::Selectable,
+        State::Selected,
+        State::Sensitive,
+        State::Showing,
+        State::SingleLine,
+        State::Stale,
+        State::Transient,
+        State::Vertical,
+        State::Visible,
+        State::ManagesDescendants,
+        State::Indeterminate,
+        State::Required,
+        State::Truncated,
+        State::Animated,
+        State::InvalidEntry,
+        State::SupportsAutocompletion,
+        State::SelectableText,
+        State::IsDefault,
+        State::Visited,
+        State::Checkable,
+        State::HasPopup,
         State::ReadOnly,
     ];
 

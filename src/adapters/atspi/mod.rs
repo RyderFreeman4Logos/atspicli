@@ -149,12 +149,11 @@ impl CommandBackend for AtspiBackend {
         self.runtime
             .block_on(async {
                 let conn = atspi::connection::AccessibilityConnection::open().await?;
-                let comp =
-                    atspi::proxy::component::ComponentProxy::builder(conn.connection())
-                        .destination(bus_name.as_str())?
-                        .path(path.as_str())?
-                        .build()
-                        .await?;
+                let comp = atspi::proxy::component::ComponentProxy::builder(conn.connection())
+                    .destination(bus_name.as_str())?
+                    .path(path.as_str())?
+                    .build()
+                    .await?;
                 let (x, y, w, h) = comp.get_extents(atspi::CoordType::Screen).await?;
                 let center_x = x + w / 2;
                 let center_y = y + h / 2;
@@ -173,12 +172,11 @@ impl CommandBackend for AtspiBackend {
         self.runtime
             .block_on(async {
                 let conn = atspi::connection::AccessibilityConnection::open().await?;
-                let comp =
-                    atspi::proxy::component::ComponentProxy::builder(conn.connection())
-                        .destination(bus_name.as_str())?
-                        .path(path.as_str())?
-                        .build()
-                        .await?;
+                let comp = atspi::proxy::component::ComponentProxy::builder(conn.connection())
+                    .destination(bus_name.as_str())?
+                    .path(path.as_str())?
+                    .build()
+                    .await?;
                 comp.grab_focus().await?;
                 Ok::<_, zbus::Error>(())
             })
@@ -263,12 +261,11 @@ impl CommandBackend for AtspiBackend {
                 .runtime
                 .block_on(async {
                     let conn = atspi::connection::AccessibilityConnection::open().await?;
-                    let comp =
-                        atspi::proxy::component::ComponentProxy::builder(conn.connection())
-                            .destination(bus_name.as_str())?
-                            .path(path.as_str())?
-                            .build()
-                            .await?;
+                    let comp = atspi::proxy::component::ComponentProxy::builder(conn.connection())
+                        .destination(bus_name.as_str())?
+                        .path(path.as_str())?
+                        .build()
+                        .await?;
                     comp.get_extents(atspi::CoordType::Screen).await
                 })
                 .map_err(|e| AtspiCliError::Atspi(e.to_string()))?;

@@ -5,17 +5,15 @@ use crate::error::{AtspiCliError, Result};
 
 /// Detect which screenshot tool is available on the system.
 fn detect_tool() -> Option<&'static str> {
-    for tool in &["grim", "import", "gnome-screenshot", "scrot"] {
-        if Command::new("which")
-            .arg(tool)
-            .output()
-            .map(|o| o.status.success())
-            .unwrap_or(false)
-        {
-            return Some(tool);
-        }
-    }
-    None
+    ["grim", "import", "gnome-screenshot", "scrot"]
+        .into_iter()
+        .find(|tool| {
+            Command::new("which")
+                .arg(tool)
+                .output()
+                .map(|o| o.status.success())
+                .unwrap_or(false)
+        })
 }
 
 /// Capture a region of the screen to the given output path.

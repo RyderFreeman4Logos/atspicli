@@ -22,7 +22,9 @@ impl AtspiQuery {
     }
 
     /// Query the AT-SPI registry for all running accessible applications.
-    async fn list_applications_async(&self) -> std::result::Result<Vec<AppDescriptor>, zbus::Error> {
+    async fn list_applications_async(
+        &self,
+    ) -> std::result::Result<Vec<AppDescriptor>, zbus::Error> {
         use atspi::connection::AccessibilityConnection;
         use atspi::proxy::accessible::AccessibleProxy;
 
@@ -182,9 +184,14 @@ impl AtspiQuery {
                 Err(_) => continue,
             };
 
-            if let Ok(Some(tree_node)) =
-                tree::find_node(conn.connection(), &child_proxy, locator, &child_bus, &child_path)
-                    .await
+            if let Ok(Some(tree_node)) = tree::find_node(
+                conn.connection(),
+                &child_proxy,
+                locator,
+                &child_bus,
+                &child_path,
+            )
+            .await
             {
                 return Ok(tree_node.to_node_descriptor(locator));
             }
@@ -248,21 +255,24 @@ impl AtspiQuery {
                     &child_path,
                 )
                 .await?;
-                return serde_json::to_string_pretty(&tree_node).map_err(|e| {
-                    zbus::Error::Failure(format!("JSON serialization failed: {e}"))
-                });
+                return serde_json::to_string_pretty(&tree_node)
+                    .map_err(|e| zbus::Error::Failure(format!("JSON serialization failed: {e}")));
             }
 
             // Find the matching node and snapshot from there
-            if let Ok(Some(found)) =
-                tree::find_node(conn.connection(), &child_proxy, locator, &child_bus, &child_path)
-                    .await
+            if let Ok(Some(found)) = tree::find_node(
+                conn.connection(),
+                &child_proxy,
+                locator,
+                &child_bus,
+                &child_path,
+            )
+            .await
             {
                 // Re-walk from the found node's position with depth limit
                 // Since we already have the tree, just re-serialize with depth
-                let json = serde_json::to_string_pretty(&found).map_err(|e| {
-                    zbus::Error::Failure(format!("JSON serialization failed: {e}"))
-                })?;
+                let json = serde_json::to_string_pretty(&found)
+                    .map_err(|e| zbus::Error::Failure(format!("JSON serialization failed: {e}")))?;
                 return Ok(json);
             }
         }
