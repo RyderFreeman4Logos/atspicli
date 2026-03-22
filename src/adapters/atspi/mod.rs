@@ -1,3 +1,4 @@
+mod capture;
 mod query;
 mod session;
 pub(crate) mod tree;
@@ -257,8 +258,23 @@ impl CommandBackend for AtspiBackend {
 
     fn screenshot(&self, locator: Option<&str>, output: &Path) -> Result<()> {
         if let Some(loc) = locator {
-            self.read_node(loc)?;
+            let (bus_name, path) = self.find_node_for_action(loc)?;
+            let (x, y, w, h) = self
+                .runtime
+                .block_on(async {
+                    let conn = atspi::connection::AccessibilityConnection::open().await?;
+                    let comp =
+                        atspi::proxy::component::ComponentProxy::builder(conn.connection())
+                            .destination(bus_name.as_str())?
+                            .path(path.as_str())?
+                            .build()
+                            .await?;
+                    comp.get_extents(atspi::CoordType::Screen).await
+                })
+                .map_err(|e| AtspiCliError::Atspi(e.to_string()))?;
+            capture::capture_region(x, y, w, h, output)
+        } else {
+            capture::capture_window(output)
         }
-        std::fs::write(output, "atspi-screenshot").map_err(AtspiCliError::from)
     }
 }
