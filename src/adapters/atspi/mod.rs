@@ -35,9 +35,9 @@ impl CommandBackend for AtspiBackend {
         self.query.has_sensitive_nodes(app)
     }
 
-    fn snapshot(&self, locator: &str) -> Result<String> {
+    fn snapshot(&self, locator: &str, depth: i32) -> Result<String> {
         let _node = self.read_node(locator)?;
-        Ok(format!("{{\"snapshot\":\"{locator}\"}}"))
+        Ok(format!("{{\"snapshot\":\"{locator}\",\"depth\":{depth}}}"))
     }
 
     fn get_property(&self, locator: &str, property: &str) -> Result<String> {
@@ -53,13 +53,20 @@ impl CommandBackend for AtspiBackend {
     }
 
     fn wait_for(&self, locator: &str, timeout: Duration) -> Result<()> {
-        if self.query.read_node(locator).is_ok() {
-            return Ok(());
+        let start = std::time::Instant::now();
+        let poll_interval = Duration::from_millis(200);
+        loop {
+            if self.query.read_node(locator).is_ok() {
+                return Ok(());
+            }
+            if start.elapsed() >= timeout {
+                return Err(AtspiCliError::Timeout {
+                    locator: locator.to_string(),
+                    timeout_ms: timeout.as_millis() as u64,
+                });
+            }
+            std::thread::sleep(poll_interval);
         }
-        Err(AtspiCliError::Timeout {
-            locator: locator.to_string(),
-            timeout_ms: timeout.as_millis() as u64,
-        })
     }
 
     fn click(&self, locator: &str, _times: u8) -> Result<()> {
