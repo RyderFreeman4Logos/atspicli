@@ -149,9 +149,29 @@ impl AtspiQuery {
             return Ok(node);
         }
 
-        runtime
-            .block_on(self.read_node_async(locator))
-            .map_err(|e| AtspiCliError::Atspi(e.to_string()))
+        match runtime.block_on(self.read_node_async(locator)) {
+            Ok(desc) => Ok(desc),
+            Err(e) => {
+                let msg = e.to_string();
+                if msg.contains("Node not found") {
+                    Err(AtspiCliError::NodeNotFound(locator.to_string()))
+                } else {
+                    Err(AtspiCliError::Atspi(msg))
+                }
+            }
+        }
+    }
+
+    /// Check whether a node actually exists in the AT-SPI tree.
+    ///
+    /// Unlike `read_node_sync`, this skips the sensitive-locator fast-path so
+    /// that `wait_for` can detect real node presence rather than always
+    /// succeeding on sensitive locators.
+    pub fn node_exists_sync(&self, locator: &str, runtime: &tokio::runtime::Runtime) -> bool {
+        if locator.trim().is_empty() {
+            return false;
+        }
+        runtime.block_on(self.read_node_async(locator)).is_ok()
     }
 
     async fn read_node_async(

@@ -113,7 +113,7 @@ impl CommandBackend for AtspiBackend {
         let start = std::time::Instant::now();
         let poll_interval = Duration::from_millis(200);
         loop {
-            if self.query.read_node_sync(locator, &self.runtime).is_ok() {
+            if self.query.node_exists_sync(locator, &self.runtime) {
                 return Ok(());
             }
             if start.elapsed() >= timeout {
