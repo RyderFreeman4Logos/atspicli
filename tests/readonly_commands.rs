@@ -14,6 +14,7 @@ fn test_readonly_commands_snapshot_get_wait_and_list_apps() {
             &context,
             &CommandRequest::Snapshot {
                 locator: "button[text=Save]".to_string(),
+                depth: 3,
             },
         )
         .expect("snapshot should succeed");
