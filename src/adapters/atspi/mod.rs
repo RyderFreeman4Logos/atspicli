@@ -1,5 +1,6 @@
 mod query;
 mod session;
+pub(crate) mod tree;
 
 use std::path::Path;
 use std::time::Duration;
@@ -39,16 +40,15 @@ impl CommandBackend for AtspiBackend {
     }
 
     fn read_node(&self, locator: &str) -> Result<NodeDescriptor> {
-        self.query.read_node(locator)
+        self.query.read_node_sync(locator, &self.runtime)
     }
 
     fn has_sensitive_nodes(&self, app: &AppDescriptor) -> Result<bool> {
-        self.query.has_sensitive_nodes(app)
+        self.query.has_sensitive_nodes_sync(app, &self.runtime)
     }
 
     fn snapshot(&self, locator: &str, depth: i32) -> Result<String> {
-        let _node = self.read_node(locator)?;
-        Ok(format!("{{\"snapshot\":\"{locator}\",\"depth\":{depth}}}"))
+        self.query.snapshot_sync(locator, depth, &self.runtime)
     }
 
     fn get_property(&self, locator: &str, property: &str) -> Result<String> {
@@ -67,7 +67,7 @@ impl CommandBackend for AtspiBackend {
         let start = std::time::Instant::now();
         let poll_interval = Duration::from_millis(200);
         loop {
-            if self.query.read_node(locator).is_ok() {
+            if self.query.read_node_sync(locator, &self.runtime).is_ok() {
                 return Ok(());
             }
             if start.elapsed() >= timeout {
